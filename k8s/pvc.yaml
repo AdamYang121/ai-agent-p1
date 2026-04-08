@@ -1,0 +1,13 @@
+# Persistent volume for the SQLite database file.
+# NOTE: SQLite only supports 1 writer at a time — keep replicas: 1 in deployment.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: remodel-db-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

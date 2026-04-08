@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - db_data:/data          # SQLite database persisted here
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GC_PASSWORD=${GC_PASSWORD:-gc-secret-2024}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - DATABASE_URL=sqlite+aiosqlite:////data/remodel.db
+
+volumes:
+  db_data:

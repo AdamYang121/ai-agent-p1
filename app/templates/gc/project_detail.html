@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Project #{{ project.id }} — GC Portal{% endblock %}
+{% block nav_links %}
+  <div style="display:flex;gap:16px;align-items:center;">
+    <a href="/gc/dashboard">← Dashboard</a>
+    <a href="/gc/logout">Log out</a>
+  </div>
+{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h2>Project #{{ project.id }} — {{ project.homeowner_name or "Awaiting intake" }}</h2>
+      <p class="text-muted">{{ project.address or "No address yet" }}</p>
+      {% if project.homeowner_email %}<p class="text-muted">{{ project.homeowner_email }} · {{ project.homeowner_phone }}</p>{% endif %}
+    </div>
+    <span class="badge badge-{{ project.status }}" style="font-size:0.85rem; padding:6px 14px;">{{ project.status }}</span>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+    <div>
+      <strong>Homeowner link:</strong>
+      <code style="background:#f0f0f0; padding:3px 8px; border-radius:4px;">/project/{{ project.token }}</code>
+      <button onclick="navigator.clipboard.writeText(window.location.origin+'/project/{{ project.token }}')"
+              class="btn btn-outline" style="margin-left:8px; padding:4px 12px; font-size:0.8rem;">Copy</button>
+    </div>
+    <a href="/gc/project/{{ project.id }}/messages" class="btn btn-primary"
+       style="padding:6px 18px; font-size:0.88rem;">
+      💬 Client Messages
+      <span id="unread-badge" style="background:rgba(255,255,255,0.3); border-radius:10px;
+            padding:1px 7px; margin-left:6px; font-size:0.75rem; display:none;"></span>
+    </a>
+  </div>
+</div>
+
+<script>
+fetch('/gc/project/{{ project.id }}/messages/unread-count')
+  .then(r => r.json()).then(d => {
+    if (d.unread > 0) {
+      const b = document.getElementById('unread-badge');
+      b.textContent = d.unread + ' new';
+      b.style.display = 'inline';
+    }
+  }).catch(() => {});
+</script>
+
+{% if project.intake %}
+<!-- Intake Summary -->
+<div class="card">
+  <h2>Intake Details</h2>
+  <div class="grid-3" style="font-size:0.9rem;">
+    <div><strong>Floor Area:</strong> {{ project.intake.bathroom_sqft }} sqft</div>
+    <div><strong>Shower Area:</strong> {{ project.intake.shower_sqft or 0 }} sqft</div>
+    <div><strong>Tub Surround:</strong> {{ project.intake.tub_sqft or 0 }} sqft</div>
+    <div><strong>Finish Level:</strong> {{ project.intake.finish_level | capitalize }}</div>
+    <div><strong>Full Gut:</strong> {{ "Yes" if project.intake.full_gut else "No" }}</div>
+    <div><strong>Relocate Plumbing:</strong> {{ "Yes" if project.intake.relocate_plumbing else "No" }}</div>
+    <div><strong>New Shower:</strong> {{ "Yes" if project.intake.new_shower else "No" }}</div>
+    <div><strong>New Tub:</strong> {{ "Yes" if project.intake.new_tub else "No" }}</div>
+    <div><strong>New Toilet:</strong> {{ "Yes" if project.intake.new_toilet else "No" }}</div>
+    <div><strong>New Vanity:</strong> {{ "Yes" if project.intake.new_vanity else "No" }}</div>
+    <div><strong>Heated Floor:</strong> {{ "Yes" if project.intake.heated_floor else "No" }}</div>
+    <div><strong>Exhaust Fan:</strong> {{ "Yes" if project.intake.new_exhaust_fan else "No" }}</div>
+  </div>
+  {% if project.intake.description %}
+  <div style="margin-top:14px;">
+    <strong>Homeowner Description:</strong>
+    <p style="margin-top:6px; color:#636e72; line-height:1.6;">{{ project.intake.description }}</p>
+  </div>
+  {% endif %}
+  {% if project.intake.ai_scope_summary %}
+  <div class="alert alert-info" style="margin-top:12px;">
+    <strong>AI Notes:</strong> {{ project.intake.ai_scope_summary }}
+  </div>
+  {% endif %}
+
+  {% if not estimate %}
+  <div style="margin-top:16px;">
+    <button class="btn btn-primary" onclick="generateEstimate()">Generate Estimate</button>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="card">
+  <p class="text-muted">Waiting for homeowner to complete the questionnaire.</p>
+</div>
+{% endif %}
+
+{% if estimate %}
+<!-- Estimate Review -->
+<div class="card" id="estimate-card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <h2>Estimate</h2>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-outline" onclick="generateEstimate()" title="Re-run from intake data">↺ Recalculate</button>
+      <a href="/gc/project/{{ project.id }}/pdf" class="btn btn-outline">⬇ Download PDF</a>
+      {% if project.status != "sent" and project.status != "accepted" %}
+      <button class="btn btn-success" onclick="sendQuote()">Send to Homeowner</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <table id="line-items-table">
+    <thead><tr><th>Item</th><th>Category</th><th>Notes</th><th class="text-right">Cost ($)</th></tr></thead>
+    <tbody>
+      {% set ns = namespace(current_cat="") %}
+      {% for item in estimate.line_items %}
+      {% if item.category != ns.current_cat %}
+      {% set ns.current_cat = item.category %}
+      <tr><td colspan="4" style="background:#eaf4fb; color:#1B4F72; font-weight:600;
+                                   font-size:0.8rem; text-transform:uppercase; padding:6px 12px;">
+        {{ item.category }}
+      </td></tr>
+      {% endif %}
+      <tr data-idx="{{ loop.index0 }}">
+        <td>{{ item.name }}</td>
+        <td class="text-muted">{{ item.category }}</td>
+        <td class="text-muted" style="font-size:0.82rem;">{{ item.notes }}</td>
+        <td class="text-right">
+          <input type="number" value="{{ item.cost }}" step="50" min="0"
+                 style="width:100px; text-align:right; border:1px solid #ddd; padding:4px 6px; border-radius:4px;"
+                 onchange="updateLineItem({{ loop.index0 }}, this.value)"/>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="3">Subtotal</td><td class="text-right" id="t-subtotal">${{ "{:,.0f}".format(estimate.subtotal) }}</td></tr>
+      <tr><td colspan="3">GC Overhead &amp; Profit (20%)</td><td class="text-right" id="t-markup">${{ "{:,.0f}".format(estimate.gc_markup) }}</td></tr>
+      <tr><td colspan="3">Seattle Sales Tax (10.25%)</td><td class="text-right" id="t-tax">${{ "{:,.0f}".format(estimate.sales_tax) }}</td></tr>
+      <tr class="totals-row"><td colspan="3">TOTAL</td><td class="text-right" id="t-total">${{ "{:,.0f}".format(estimate.total) }}</td></tr>
+    </tfoot>
+  </table>
+
+  <div style="margin-top:20px;">
+    <label>Notes &amp; Exclusions (shown on quote)</label>
+    <textarea id="gc-notes" rows="3" placeholder="e.g. Permit fees not included. Tile selection from approved list. Demo assumes no asbestos.">{{ estimate.gc_notes }}</textarea>
+    <button class="btn btn-primary" style="margin-top:8px;" onclick="saveNotes()">Save Notes</button>
+  </div>
+
+  <div id="save-status" style="margin-top:8px; color:#27ae60; font-size:0.85rem; display:none;">Saved ✓</div>
+</div>
+{% endif %}
+
+<script>
+let lineItems = {{ estimate.line_items | tojson if estimate else "[]" }};
+
+function updateLineItem(idx, value) {
+  lineItems[idx].cost = parseFloat(value) || 0;
+  saveLineItems();
+}
+
+async function saveLineItems() {
+  const res = await fetch('/gc/project/{{ project.id }}/estimate/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({line_items: lineItems})
+  });
+  const data = await res.json();
+  document.getElementById('t-subtotal').textContent = '$' + data.subtotal.toLocaleString('en-US', {maximumFractionDigits:0});
+  document.getElementById('t-markup').textContent   = '$' + data.gc_markup.toLocaleString('en-US', {maximumFractionDigits:0});
+  document.getElementById('t-tax').textContent      = '$' + data.sales_tax.toLocaleString('en-US', {maximumFractionDigits:0});
+  document.getElementById('t-total').textContent    = '$' + data.total.toLocaleString('en-US', {maximumFractionDigits:0});
+  showSaved();
+}
+
+async function saveNotes() {
+  await fetch('/gc/project/{{ project.id }}/estimate/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({gc_notes: document.getElementById('gc-notes').value})
+  });
+  showSaved();
+}
+
+function showSaved() {
+  const s = document.getElementById('save-status');
+  s.style.display = 'block';
+  setTimeout(() => s.style.display = 'none', 2000);
+}
+
+async function generateEstimate() {
+  const btn = event.target;
+  btn.textContent = 'Generating…';
+  btn.disabled = true;
+  await fetch('/gc/project/{{ project.id }}/estimate', {method: 'POST'});
+  location.reload();
+}
+
+async function sendQuote() {
+  if (!confirm('Send this quote to the homeowner?')) return;
+  const res = await fetch('/gc/project/{{ project.id }}/send', {method: 'POST'});
+  const data = await res.json();
+  alert('Quote sent! Homeowner link: ' + window.location.origin + data.homeowner_url);
+  location.reload();
+}
+</script>
+{% endblock %}

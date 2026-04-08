@@ -39,3 +39,9 @@ htmlcov/
 
 # macOS
 .DS_Store
+
+# Database
+remodel.db
+
+# Claude Code
+.claude/

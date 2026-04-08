@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Messages — Project #{{ project.id }}{% endblock %}
+{% block nav_links %}
+  <div style="display:flex;gap:16px;align-items:center;">
+    <a href="/gc/project/{{ project.id }}">← Project Detail</a>
+    <a href="/gc/dashboard">Dashboard</a>
+    <a href="/gc/logout">Log out</a>
+  </div>
+{% endblock %}
+
+{% block head %}
+<style>
+  .filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:18px; }
+  .filter-group { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { display:inline-block; padding:5px 13px; border-radius:20px; font-size:0.78rem;
+          font-weight:500; cursor:pointer; border:1.5px solid #dfe6e9;
+          background:white; color:#636e72; text-decoration:none; transition:all .15s; }
+  .chip:hover { border-color:#2E86C1; color:#2E86C1; }
+  .chip.active { background:#2E86C1; color:white; border-color:#2E86C1; }
+  .chip .cnt { background:rgba(255,255,255,0.3); border-radius:10px;
+               padding:1px 6px; margin-left:5px; font-size:0.72rem; }
+  .chip:not(.active) .cnt { background:#f0f0f0; color:#636e72; }
+
+  .msg-card { background:white; border-radius:10px; padding:20px 24px;
+              box-shadow:0 1px 4px rgba(0,0,0,0.07); margin-bottom:14px;
+              border-left:4px solid #dfe6e9; transition:border-color .2s; }
+  .msg-card.unread  { border-left-color:#e74c3c; }
+  .msg-card.ai      { border-left-color:#f39c12; }
+  .msg-card.gc      { border-left-color:#27ae60; }
+  .msg-card.unanswered { border-left-color:#95a5a6; }
+
+  .msg-meta { display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+              margin-bottom:10px; font-size:0.78rem; color:#636e72; }
+  .topic-chip { padding:2px 9px; border-radius:10px; background:#eaf4fb;
+                color:#2E86C1; font-weight:600; font-size:0.72rem; text-transform:uppercase; }
+  .answered-badge { padding:2px 9px; border-radius:10px; font-weight:600;
+                    font-size:0.72rem; text-transform:uppercase; }
+  .answered-badge.ai { background:#fef9e7; color:#d68910; }
+  .answered-badge.gc { background:#eafaf1; color:#1e8449; }
+  .answered-badge.none { background:#f2f3f4; color:#95a5a6; }
+
+  .msg-question { font-weight:600; font-size:0.95rem; margin-bottom:10px; color:#2d3436; }
+  .msg-answer { background:#f8f9fa; border-radius:6px; padding:12px 14px;
+                font-size:0.88rem; line-height:1.6; color:#2d3436; }
+  .msg-answer.no-answer { color:#95a5a6; font-style:italic; }
+
+  .override-area { margin-top:12px; display:none; }
+  .override-area textarea { width:100%; padding:9px 12px; border:1.5px solid #2E86C1;
+                             border-radius:6px; font-size:0.88rem; resize:vertical; }
+  .override-actions { display:flex; gap:8px; margin-top:8px; }
+  .save-note { color:#27ae60; font-size:0.82rem; display:none; margin-top:6px; }
+
+  .empty-state { text-align:center; padding:48px; color:#95a5a6; }
+  .sort-select { padding:6px 10px; border:1.5px solid #dfe6e9; border-radius:6px;
+                 font-size:0.85rem; background:white; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+  <div>
+    <h2 style="color:#1B4F72; font-size:1.25rem; margin-bottom:2px;">
+      Client Questions — {{ project.homeowner_name or "Project #" + project.id|string }}
+    </h2>
+    <p class="text-muted">{{ project.address or "No address" }}</p>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <span class="text-muted" style="font-size:0.82rem;">Sort:</span>
+    <select class="sort-select" onchange="applyFilter('sort', this.value)">
+      <option value="newest" {% if current_sort=='newest' %}selected{% endif %}>Newest first</option>
+      <option value="oldest" {% if current_sort=='oldest' %}selected{% endif %}>Oldest first</option>
+    </select>
+  </div>
+</div>
+
+<!-- Status filters -->
+<div class="filter-bar">
+  <span class="text-muted" style="font-size:0.8rem; font-weight:600;">STATUS</span>
+  <div class="filter-group">
+    {% set statuses = [
+      ("all",          "All",            status_counts.all),
+      ("unanswered",   "Unanswered",     status_counts.unanswered),
+      ("needs_review", "AI — Review Me", status_counts.needs_review),
+      ("gc_answered",  "GC Answered",    status_counts.gc_answered),
+    ] %}
+    {% for val, label, cnt in statuses %}
+    <a class="chip {% if current_status == val %}active{% endif %}"
+       href="?sort={{ current_sort }}&topic={{ current_topic }}&status={{ val }}">
+      {{ label }}<span class="cnt">{{ cnt }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Topic filters -->
+<div class="filter-bar">
+  <span class="text-muted" style="font-size:0.8rem; font-weight:600;">TOPIC</span>
+  <div class="filter-group">
+    <a class="chip {% if current_topic == 'all' %}active{% endif %}"
+       href="?sort={{ current_sort }}&topic=all&status={{ current_status }}">
+      All<span class="cnt">{{ status_counts.all }}</span>
+    </a>
+    {% for t in topics %}
+    {% if topic_counts[t] > 0 %}
+    <a class="chip {% if current_topic == t %}active{% endif %}"
+       href="?sort={{ current_sort }}&topic={{ t }}&status={{ current_status }}">
+      {{ t|capitalize }}<span class="cnt">{{ topic_counts[t] }}</span>
+    </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Message cards -->
+{% if messages %}
+  {% for msg in messages %}
+  {% set card_class = "gc" if msg.answered_by == "gc" else ("ai" if msg.answered_by == "ai" else "unanswered") %}
+  <div class="msg-card {{ card_class }}" id="msg-{{ msg.id }}">
+    <div class="msg-meta">
+      <span>{{ msg.created_at.strftime("%b %d, %Y  %I:%M %p") }}</span>
+      <span class="topic-chip">{{ msg.topic }}</span>
+      {% if msg.answered_by == "gc" %}
+        <span class="answered-badge gc">GC Answered</span>
+      {% elif msg.answered_by == "ai" %}
+        <span class="answered-badge ai">AI Draft — Needs Review</span>
+      {% else %}
+        <span class="answered-badge none">Unanswered</span>
+      {% endif %}
+      {% if msg.answered_at %}
+        <span>Answered {{ msg.answered_at.strftime("%b %d, %Y  %I:%M %p") }}</span>
+      {% endif %}
+    </div>
+
+    <div class="msg-question">Q: {{ msg.question }}</div>
+
+    <div class="msg-answer {% if not msg.answer %}no-answer{% endif %}" id="answer-display-{{ msg.id }}">
+      {% if msg.answer %}{{ msg.answer }}{% else %}No answer yet.{% endif %}
+    </div>
+
+    <!-- Override / write answer -->
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-outline" style="padding:5px 14px; font-size:0.82rem;"
+              onclick="toggleOverride({{ msg.id }}, `{{ msg.answer | replace('`', "'") | replace('\n', '\\n') }}`)">
+        {% if msg.answered_by == 'gc' %}Edit Answer{% elif msg.answered_by == 'ai' %}Override AI Answer{% else %}Write Answer{% endif %}
+      </button>
+    </div>
+
+    <div class="override-area" id="override-{{ msg.id }}">
+      <textarea id="override-text-{{ msg.id }}" rows="4"
+                placeholder="Type your answer to the client..."></textarea>
+      <div class="override-actions">
+        <button class="btn btn-success" style="padding:6px 16px; font-size:0.85rem;"
+                onclick="submitAnswer({{ msg.id }})">Save Answer</button>
+        <button class="btn btn-outline" style="padding:6px 14px; font-size:0.85rem;"
+                onclick="toggleOverride({{ msg.id }})">Cancel</button>
+      </div>
+      <div class="save-note" id="save-note-{{ msg.id }}">✓ Answer saved — client will see this</div>
+    </div>
+  </div>
+  {% endfor %}
+
+{% else %}
+  <div class="empty-state card">
+    <div style="font-size:2.5rem; margin-bottom:12px;">💬</div>
+    <p>No questions match your current filters.</p>
+  </div>
+{% endif %}
+
+<script>
+function applyFilter(key, value) {
+  const params = new URLSearchParams(window.location.search);
+  params.set(key, value);
+  window.location.search = params.toString();
+}
+
+function toggleOverride(id, existingAnswer = '') {
+  const area = document.getElementById(`override-${id}`);
+  const textarea = document.getElementById(`override-text-${id}`);
+  const isOpen = area.style.display === 'block';
+  area.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen && textarea.value === '') {
+    textarea.value = existingAnswer.replace(/\\n/g, '\n');
+  }
+}
+
+async function submitAnswer(id) {
+  const text = document.getElementById(`override-text-${id}`).value.trim();
+  if (!text) return;
+
+  const res = await fetch(`/gc/project/{{ project.id }}/messages/${id}/answer`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({answer: text}),
+  });
+  const data = await res.json();
+
+  document.getElementById(`answer-display-${id}`).textContent = data.answer;
+  document.getElementById(`answer-display-${id}`).classList.remove('no-answer');
+  document.getElementById(`override-${id}`).style.display = 'none';
+  document.getElementById(`save-note-${id}`).style.display = 'block';
+
+  // Update card border & badge
+  const card = document.getElementById(`msg-${id}`);
+  card.className = 'msg-card gc';
+  card.querySelector('.answered-badge').className = 'answered-badge gc';
+  card.querySelector('.answered-badge').textContent = 'GC Answered';
+  setTimeout(() => document.getElementById(`save-note-${id}`).style.display = 'none', 3000);
+}
+</script>
+{% endblock %}

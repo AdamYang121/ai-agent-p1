@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}GC Dashboard — Northwest Remodel Co.{% endblock %}
+{% block nav_links %}
+  <div style="display:flex;gap:16px;align-items:center;">
+    <span style="color:rgba(255,255,255,0.7);font-size:0.85rem;">GC Portal</span>
+    <a href="/gc/logout">Log out</a>
+  </div>
+{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+  <h2 style="color:#1B4F72; font-size:1.3rem;">Projects</h2>
+  <button class="btn btn-primary" onclick="createProject()">+ New Project Link</button>
+</div>
+
+<div id="new-link-box" style="display:none;" class="alert alert-info">
+  Homeowner link: <strong id="new-link-url"></strong>
+  <button onclick="navigator.clipboard.writeText(document.getElementById('new-link-url').textContent)"
+          class="btn btn-outline" style="margin-left:12px; padding:4px 12px; font-size:0.8rem;">Copy</button>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Client</th>
+        <th>Address</th>
+        <th>Status</th>
+        <th>Total</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in projects %}
+      <tr>
+        <td>#{{ p.id }}</td>
+        <td>{{ p.homeowner_name or "—" }}</td>
+        <td>{{ p.address or "—" }}</td>
+        <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
+        <td>
+          {% if p.estimate %}${{ "{:,.0f}".format(p.estimate.total) }}{% else %}—{% endif %}
+        </td>
+        <td class="text-muted">{{ p.created_at.strftime("%b %d, %Y") }}</td>
+        <td><a href="/gc/project/{{ p.id }}" class="btn btn-outline" style="padding:5px 14px;font-size:0.82rem;">View</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center; color:#636e72; padding:32px;">
+        No projects yet. Create a new project link to get started.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+async function createProject() {
+  const res = await fetch('/gc/projects/new', {method:'POST'});
+  const data = await res.json();
+  const box = document.getElementById('new-link-box');
+  const url = document.getElementById('new-link-url');
+  url.textContent = window.location.origin + data.homeowner_url;
+  box.style.display = 'block';
+  setTimeout(() => location.reload(), 3000);
+}
+</script>
+{% endblock %}

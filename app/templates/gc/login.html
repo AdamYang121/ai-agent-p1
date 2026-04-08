@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}GC Login — Northwest Remodel Co.{% endblock %}
+{% block content %}
+<div class="card" style="max-width:400px; margin:60px auto;">
+  <h2>Contractor Login</h2>
+  {% if error %}<div class="alert" style="background:#f8d7da;color:#721c24;margin-bottom:12px;">{{ error }}</div>{% endif %}
+  <form method="post" action="/gc/login">
+    <label>Password</label>
+    <input type="password" name="password" autofocus placeholder="Enter password"/>
+    <div style="margin-top:20px;">
+      <button type="submit" class="btn btn-primary" style="width:100%;">Log In</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

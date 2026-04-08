@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}Your Quote — Northwest Remodel Co.{% endblock %}
+
+{% block head %}
+<style>
+  .chat-wrap { display:flex; flex-direction:column; gap:14px; margin-bottom:20px; }
+  .chat-bubble { border-radius:10px; padding:14px 16px; max-width:100%; }
+  .bubble-q { background:#2E86C1; color:white; align-self:flex-end;
+              border-bottom-right-radius:3px; }
+  .bubble-a { background:white; border:1px solid #dfe6e9;
+              border-bottom-left-radius:3px; }
+  .bubble-meta { font-size:0.72rem; margin-top:6px; opacity:0.7; }
+  .bubble-q .bubble-meta { text-align:right; }
+  .answered-by { display:inline-block; padding:2px 8px; border-radius:10px;
+                 font-size:0.7rem; font-weight:600; text-transform:uppercase;
+                 margin-bottom:6px; }
+  .answered-by.ai { background:#fef9e7; color:#d68910; }
+  .answered-by.gc { background:#eafaf1; color:#1e8449; }
+  .topic-pill { display:inline-block; background:#eaf4fb; color:#2E86C1;
+                padding:2px 8px; border-radius:10px; font-size:0.7rem;
+                font-weight:600; text-transform:uppercase; margin-left:6px; }
+  .filter-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
+  .pill { padding:4px 12px; border-radius:14px; font-size:0.78rem; font-weight:500;
+          cursor:pointer; border:1.5px solid #dfe6e9; background:white;
+          color:#636e72; transition:all .15s; }
+  .pill.active { background:#2E86C1; color:white; border-color:#2E86C1; }
+  .ask-row { display:flex; gap:8px; margin-top:4px; }
+  .ask-row input { flex:1; }
+  .typing { color:#636e72; font-style:italic; font-size:0.85rem;
+            display:none; margin-top:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if project.status == "accepted" %}
+<div class="alert alert-info">You've accepted this quote. We'll be in touch to schedule a start date.</div>
+{% elif project.status == "rejected" %}
+<div class="alert" style="background:#f8d7da;color:#721c24;">You've declined this quote. Contact us to discuss options.</div>
+{% endif %}
+
+<!-- Quote summary -->
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h2 style="margin-bottom:4px;">Your Bathroom Remodel Quote</h2>
+      <p class="text-muted">Northwest Remodel Co. · Seattle, WA</p>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:2rem; font-weight:700; color:#1B4F72;">${{ "{:,.0f}".format(estimate.total) }}</div>
+      <div class="text-muted">Total Estimate</div>
+    </div>
+  </div>
+</div>
+
+<!-- Line items -->
+<div class="card">
+  <h2>Line Items</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Notes</th><th class="text-right">Cost</th></tr></thead>
+    <tbody>
+      {% set ns = namespace(current_cat="") %}
+      {% for item in estimate.line_items %}
+        {% if item.category != ns.current_cat %}
+          {% set ns.current_cat = item.category %}
+          <tr><td colspan="3" style="background:#eaf4fb; color:#1B4F72; font-weight:600;
+                                      padding:6px 12px; font-size:0.82rem; text-transform:uppercase;">
+            {{ item.category }}
+          </td></tr>
+        {% endif %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td class="text-muted">{{ item.notes }}</td>
+          <td class="text-right">${{ "{:,.0f}".format(item.cost) }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="2">Subtotal</td><td class="text-right">${{ "{:,.0f}".format(estimate.subtotal) }}</td></tr>
+      <tr><td colspan="2">GC Overhead &amp; Profit (20%)</td><td class="text-right">${{ "{:,.0f}".format(estimate.gc_markup) }}</td></tr>
+      <tr><td colspan="2">Seattle Sales Tax (10.25% on materials)</td><td class="text-right">${{ "{:,.0f}".format(estimate.sales_tax) }}</td></tr>
+      <tr class="totals-row"><td colspan="2">TOTAL</td><td class="text-right">${{ "{:,.0f}".format(estimate.total) }}</td></tr>
+    </tfoot>
+  </table>
+</div>
+
+{% if estimate.gc_notes %}
+<div class="card">
+  <h2>Notes from Your Contractor</h2>
+  <p style="line-height:1.7;">{{ estimate.gc_notes }}</p>
+</div>
+{% endif %}
+
+<!-- Accept / Reject -->
+{% if project.status == "sent" %}
+<div class="card" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+  <span style="flex:1; color:#636e72;">Ready to move forward?</span>
+  <form method="post" action="/project/{{ project.token }}/respond" style="display:inline;">
+    <input type="hidden" name="action" value="accept"/>
+    <button type="submit" class="btn btn-success">Accept Quote</button>
+  </form>
+  <form method="post" action="/project/{{ project.token }}/respond" style="display:inline;">
+    <input type="hidden" name="action" value="reject"/>
+    <button type="submit" class="btn btn-danger">Decline</button>
+  </form>
+</div>
+{% endif %}
+
+<!-- Q&A Chat -->
+<div class="card">
+  <h2>Questions &amp; Answers</h2>
+  <p class="text-muted" style="margin-bottom:14px;">
+    Ask anything about your quote — our AI assistant answers instantly.
+    Your contractor can also review and update answers directly.
+  </p>
+
+  <!-- Filters -->
+  <div class="filter-row" id="filter-row" style="display:none;">
+    <span class="text-muted" style="font-size:0.8rem;">Filter:</span>
+    <button class="pill active" onclick="filterMessages('all', this)">All</button>
+    <button class="pill" onclick="filterMessages('pricing', this)">Pricing</button>
+    <button class="pill" onclick="filterMessages('plumbing', this)">Plumbing</button>
+    <button class="pill" onclick="filterMessages('electrical', this)">Electrical</button>
+    <button class="pill" onclick="filterMessages('tile', this)">Tile</button>
+    <button class="pill" onclick="filterMessages('timeline', this)">Timeline</button>
+    <button class="pill" onclick="filterMessages('scope', this)">Scope</button>
+    <button class="pill" onclick="filterMessages('permits', this)">Permits</button>
+    <button class="pill" onclick="filterMessages('warranty', this)">Warranty</button>
+    <span style="margin-left:auto;">
+      <button class="pill" onclick="toggleSort()">⇅ <span id="sort-label">Newest first</span></button>
+    </span>
+  </div>
+
+  <!-- Chat history -->
+  <div class="chat-wrap" id="chat-history"></div>
+
+  <!-- Ask box -->
+  <div class="ask-row">
+    <input type="text" id="question-input"
+           placeholder="e.g. Why is plumbing so expensive? Can we get a cheaper tile option?"
+           onkeydown="if(event.key==='Enter') askQuestion()"/>
+    <button class="btn btn-primary" onclick="askQuestion()">Ask</button>
+  </div>
+  <div class="typing" id="typing-indicator">AI is thinking…</div>
+</div>
+
+<script>
+const TOKEN = "{{ project.token }}";
+let allMessages = [];
+let currentFilter = 'all';
+let sortNewest = true;
+
+async function loadHistory() {
+  const res = await fetch(`/project/${TOKEN}/messages?sort=oldest`);
+  allMessages = await res.json();
+  if (allMessages.length > 0) {
+    document.getElementById('filter-row').style.display = 'flex';
+  }
+  renderMessages();
+}
+
+function renderMessages() {
+  const wrap = document.getElementById('chat-history');
+  let msgs = allMessages.filter(m => currentFilter === 'all' || m.topic === currentFilter);
+  if (sortNewest) msgs = [...msgs].reverse();
+
+  if (msgs.length === 0) {
+    wrap.innerHTML = '<p class="text-muted" style="text-align:center; padding:16px;">No questions yet.</p>';
+    return;
+  }
+
+  wrap.innerHTML = msgs.map(m => `
+    <div data-topic="${m.topic}">
+      <div class="chat-bubble bubble-q">
+        <div>${escHtml(m.question)}</div>
+        <div class="bubble-meta">${m.created_at}
+          <span class="topic-pill">${m.topic}</span>
+        </div>
+      </div>
+      ${m.answer ? `
+      <div class="chat-bubble bubble-a">
+        <div class="answered-by ${m.answered_by === 'gc' ? 'gc' : 'ai'}">
+          ${m.answered_by === 'gc' ? 'Your Contractor' : 'AI Assistant'}
+        </div>
+        <div>${escHtml(m.answer)}</div>
+        ${m.answered_at ? `<div class="bubble-meta">${m.answered_at}</div>` : ''}
+      </div>` : ''}
+    </div>
+  `).join('');
+}
+
+function filterMessages(topic, btn) {
+  currentFilter = topic;
+  document.querySelectorAll('#filter-row .pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderMessages();
+}
+
+function toggleSort() {
+  sortNewest = !sortNewest;
+  document.getElementById('sort-label').textContent = sortNewest ? 'Newest first' : 'Oldest first';
+  renderMessages();
+}
+
+async function askQuestion() {
+  const input = document.getElementById('question-input');
+  const q = input.value.trim();
+  if (!q) return;
+
+  input.value = '';
+  input.disabled = true;
+  document.getElementById('typing-indicator').style.display = 'block';
+
+  try {
+    const res = await fetch(`/project/${TOKEN}/ask`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question: q}),
+    });
+    const data = await res.json();
+    allMessages.push({
+      id: data.id,
+      question: q,
+      answer: data.answer,
+      answered_by: data.answered_by,
+      topic: data.topic,
+      created_at: data.created_at,
+      answered_at: data.created_at,
+    });
+    if (allMessages.length === 1) {
+      document.getElementById('filter-row').style.display = 'flex';
+    }
+    renderMessages();
+    // Scroll to bottom
+    document.getElementById('chat-history').lastElementChild?.scrollIntoView({behavior:'smooth'});
+  } catch(e) {
+    alert('Something went wrong. Please try again.');
+  } finally {
+    input.disabled = false;
+    input.focus();
+    document.getElementById('typing-indicator').style.display = 'none';
+  }
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>');
+}
+
+loadHistory();
+</script>
+{% endblock %}

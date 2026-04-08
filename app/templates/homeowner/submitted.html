@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Submitted — Northwest Remodel Co.{% endblock %}
+{% block content %}
+<div class="card" style="text-align:center; padding: 48px;">
+  <div style="font-size: 3rem; margin-bottom: 16px;">✅</div>
+  <h2 style="font-size: 1.4rem; margin-bottom: 12px;">We've Got Your Info!</h2>
+  <p style="color:#636e72; max-width: 480px; margin: 0 auto 24px;">
+    Thank you, <strong>{{ project.homeowner_name }}</strong>! We're reviewing your project details
+    and will prepare your personalized quote shortly. You'll be notified once it's ready.
+  </p>
+  <p class="text-muted">Keep this link to check back: <br/>
+    <code style="background:#f0f0f0; padding: 4px 8px; border-radius:4px;">
+      /project/{{ project.token }}
+    </code>
+  </p>
+</div>
+{% endblock %}

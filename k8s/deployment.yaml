@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: remodel-app
+  namespace: default
+spec:
+  # SQLite does not support concurrent writers — keep at 1
+  replicas: 1
+  selector:
+    matchLabels:
+      app: remodel-app
+  template:
+    metadata:
+      labels:
+        app: remodel-app
+    spec:
+      containers:
+        - name: remodel-app
+          image: remodel-app:latest      # replace with your registry image, e.g. ghcr.io/you/remodel-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: sqlite+aiosqlite:////data/remodel.db
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: remodel-secrets
+                  key: ANTHROPIC_API_KEY
+            - name: GC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: remodel-secrets
+                  key: GC_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: remodel-secrets
+                  key: SECRET_KEY
+          volumeMounts:
+            - name: db-storage
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /gc/login
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: remodel-db-pvc

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Your Bathroom Remodel — Northwest Remodel Co.{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h2>Tell Us About Your Bathroom Remodel</h2>
+  <p class="text-muted">Fill in as much detail as you can. The more we know, the more accurate your estimate.</p>
+
+  <form method="post" action="/project/{{ project.token }}/submit">
+
+    <hr class="section-divider">
+    <h3 style="color:#1B4F72; font-size:1rem;">Your Contact Info</h3>
+    <div class="grid-2">
+      <div>
+        <label>Full Name *</label>
+        <input type="text" name="homeowner_name" required placeholder="Jane Smith"/>
+      </div>
+      <div>
+        <label>Email</label>
+        <input type="email" name="homeowner_email" placeholder="jane@example.com"/>
+      </div>
+      <div>
+        <label>Phone</label>
+        <input type="tel" name="homeowner_phone" placeholder="(206) 555-1234"/>
+      </div>
+      <div>
+        <label>Property Address</label>
+        <input type="text" name="address" placeholder="123 Main St, Seattle, WA 98101"/>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+    <h3 style="color:#1B4F72; font-size:1rem;">Bathroom Size</h3>
+    <div class="grid-3">
+      <div>
+        <label>Bathroom Floor Area (sq ft) *</label>
+        <input type="number" name="bathroom_sqft" required min="20" max="500"
+               placeholder="e.g. 50" step="0.5"/>
+      </div>
+      <div>
+        <label>Shower Wall Tile Area (sq ft)</label>
+        <input type="number" name="shower_sqft" min="0" max="300"
+               placeholder="e.g. 60" step="0.5" id="shower_sqft_input"/>
+      </div>
+      <div>
+        <label>Tub Surround Tile Area (sq ft)</label>
+        <input type="number" name="tub_sqft" min="0" max="200"
+               placeholder="e.g. 40" step="0.5" id="tub_sqft_input"/>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+    <h3 style="color:#1B4F72; font-size:1rem;">Finish Level</h3>
+    <label>What's your budget preference?</label>
+    <select name="finish_level">
+      <option value="budget">Budget — Functional, cost-effective materials</option>
+      <option value="mid" selected>Mid-Range — Quality fixtures, porcelain tile</option>
+      <option value="luxury">Luxury — Premium brands, custom tile, high-end finishes</option>
+    </select>
+
+    <hr class="section-divider">
+    <h3 style="color:#1B4F72; font-size:1rem;">Scope of Work</h3>
+    <p class="text-muted">Check everything that applies.</p>
+
+    <div class="grid-2">
+      <div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="full_gut" id="full_gut" value="true" checked/>
+          <label for="full_gut">Full gut to studs (complete tear-down)</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="new_shower" id="new_shower" value="true"
+                 onchange="document.getElementById('shower_sqft_input').disabled = !this.checked"/>
+          <label for="new_shower">New / replace shower</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="has_tub" id="has_tub" value="true"
+                 onchange="document.getElementById('tub_sqft_input').disabled = !this.checked"/>
+          <label for="has_tub">Has / will have a bathtub</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="new_tub" value="true"/>
+          <label>New / replace bathtub</label>
+        </div>
+      </div>
+      <div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="new_toilet" value="true" checked/>
+          <label>New toilet</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="new_vanity" value="true" checked/>
+          <label>New vanity &amp; sink</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="relocate_plumbing" value="true"/>
+          <label>Relocate plumbing (move drain/supply lines)</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="heated_floor" value="true"/>
+          <label>Radiant heated floor</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="new_exhaust_fan" value="true" checked/>
+          <label>New exhaust fan</label>
+        </div>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+    <h3 style="color:#1B4F72; font-size:1rem;">Describe Your Project (Optional)</h3>
+    <p class="text-muted">Tell us anything else — style preferences, specific fixtures, concerns, timeline, etc.
+      Our AI will read this to refine your estimate.</p>
+    <textarea name="description" rows="4"
+              placeholder="e.g. We want a walk-in shower with frameless glass, hex floor tile, a floating double vanity, and a soaking tub. Looking for a clean, modern look. Hoping to start in June."></textarea>
+
+    <div style="margin-top: 24px;">
+      <button type="submit" class="btn btn-primary" style="font-size:1rem; padding: 12px 32px;">
+        Submit &amp; Get My Estimate →
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
